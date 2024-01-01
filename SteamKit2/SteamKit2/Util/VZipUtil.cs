@@ -4,7 +4,7 @@ using System.IO.Hashing;
 
 namespace SteamKit2
 {
-    class VZipUtil
+    public class VZipUtil
     {
         private static ushort VZipHeader = 0x5A56;
         private static ushort VZipFooter = 0x767A;
@@ -14,7 +14,7 @@ namespace SteamKit2
         private static char Version = 'a';
 
 
-        public static byte[] Decompress(byte[] buffer)
+        public static byte[] Decompress(byte[] buffer, int? length = null)
         {
             using MemoryStream ms = new MemoryStream( buffer );
             using BinaryReader reader = new BinaryReader( ms );
@@ -34,7 +34,7 @@ namespace SteamKit2
 
             byte[] properties = reader.ReadBytes( 5 );
             var compressedPosition = ms.Position;
-            var compressedLength = ( int )ms.Length - HeaderLength - FooterLength - 5;
+            var compressedLength = ( int )( length ?? ms.Length ) - HeaderLength - FooterLength - 5;
             //byte[] compressedBuffer = reader.ReadBytes( ( int )ms.Length - HeaderLength - FooterLength - 5 );
             ms.Position += compressedLength;
 

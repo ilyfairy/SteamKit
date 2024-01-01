@@ -25,12 +25,12 @@ namespace SteamKit2.CDN
         /// <value>
         ///   <c>true</c> if this chunk has been processed; otherwise, <c>false</c>.
         /// </value>
-        public bool IsProcessed { get; internal set; }
+        public bool IsProcessed { get; set; }
 
         /// <summary>
         /// Gets the underlying data for this chunk.
         /// </summary>
-        public byte[] Data { get; private set; }
+        public byte[] Data { get; set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DepotChunk"/> class.
