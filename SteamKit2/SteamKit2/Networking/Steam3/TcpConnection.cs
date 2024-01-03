@@ -8,6 +8,7 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace SteamKit2
 {
@@ -145,7 +146,7 @@ namespace SteamKit2
             }
         }
 
-        private void TryConnect(int timeout)
+        private async Task TryConnect(int timeout)
         {
             DebugLog.Assert( cancellationToken != null, nameof( TcpConnection ), "null CancellationToken in TryConnect" );
 
@@ -166,7 +167,7 @@ namespace SteamKit2
 
                 using ( connectCancellation.Token.Register( s => ( ( Socket )s! ).Dispose(), socket ) )
                 {
-                    socket.Connect( CurrentEndPoint );
+                    await socket.ConnectAsync( CurrentEndPoint );
                 }
             }
             catch ( SocketException ) when ( cancellationToken.IsCancellationRequested )
@@ -187,7 +188,7 @@ namespace SteamKit2
         /// </summary>
         /// <param name="endPoint">The end point to connect to.</param>
         /// <param name="timeout">Timeout in milliseconds</param>
-        public void Connect(EndPoint endPoint, int timeout)
+        public Task ConnectAsync(EndPoint endPoint, int timeout)
         {
             lock ( netLock )
             {
@@ -200,7 +201,7 @@ namespace SteamKit2
 
                 CurrentEndPoint = endPoint;
                 log.LogDebug( nameof( TcpConnection ), "Connecting to {0}...", CurrentEndPoint );
-                TryConnect( timeout );
+                return TryConnect( timeout );
             }
 
         }
