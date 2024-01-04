@@ -5,6 +5,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using SteamKit2.Internal;
 
@@ -58,8 +59,9 @@ namespace SteamKit2
         /// <param name="manifestId">The ManifestID that will be downloaded.</param>
         /// <param name="branch">The branch name this manifest belongs to.</param>
         /// <param name="branchPasswordHash">The branch password. TODO: how is it hashed?</param>
+        /// <param name="cancellationToken"></param>
         /// <returns>Returns the manifest request code, it may be zero if it was not granted.</returns>
-        public async Task<ulong> GetManifestRequestCode( uint depotId, uint appId, ulong manifestId, string? branch = null, string? branchPasswordHash = null )
+        public async Task<ulong> GetManifestRequestCode( uint depotId, uint appId, ulong manifestId, string? branch = null, string? branchPasswordHash = null, CancellationToken cancellationToken = default )
         {
             if ( string.Equals( branch, "public", StringComparison.InvariantCultureIgnoreCase ) )
             {
@@ -85,7 +87,7 @@ namespace SteamKit2
             // can't really do HandleMsg because it requires parsing the service like its done in HandleServiceMethod
             var unifiedMessages = Client.GetHandler<SteamUnifiedMessages>()!;
             var contentService = unifiedMessages.CreateService<IContentServerDirectory>();
-            var message = await contentService.SendMessage( api => api.GetManifestRequestCode( request ) );
+            var message = await contentService.SendMessage( api => api.GetManifestRequestCode( request ), cancellationToken );
             var response = message.GetDeserializedResponse<CContentServerDirectory_GetManifestRequestCode_Response>();
 
             return response.manifest_request_code;

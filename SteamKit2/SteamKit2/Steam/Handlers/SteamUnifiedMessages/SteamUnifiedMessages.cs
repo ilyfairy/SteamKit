@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Threading;
 using ProtoBuf;
 
 namespace SteamKit2
@@ -42,10 +43,11 @@ namespace SteamKit2
             /// </summary>
             /// <typeparam name="TResponse">The type of the protobuf object which is the response to the RPC call.</typeparam>
             /// <param name="expr">RPC call expression, e.g. x => x.SomeMethodCall(message);</param>
+            /// <param name="cancellationToken"></param>
             /// <returns>The JobID of the request. This can be used to find the appropriate <see cref="ServiceMethodResponse"/>.</returns>
-            public AsyncJob<ServiceMethodResponse> SendMessage<TResponse>( Expression<Func<TService, TResponse>> expr )
+            public AsyncJob<ServiceMethodResponse> SendMessage<TResponse>( Expression<Func<TService, TResponse>> expr, CancellationToken cancellationToken = default )
             {
-                return SendMessageOrNotification( expr, false )!;
+                return SendMessageOrNotification( expr, false, cancellationToken )!;
             }
 
             /// <summary>
@@ -53,12 +55,13 @@ namespace SteamKit2
             /// </summary>
             /// <typeparam name="TResponse">The type of the protobuf object which is the response to the RPC call.</typeparam>
             /// <param name="expr">RPC call expression, e.g. x => x.SomeMethodCall(message);</param>
-            public void SendNotification<TResponse>( Expression<Func<TService, TResponse>> expr )
+            /// <param name="cancellationToken"></param>
+            public void SendNotification<TResponse>( Expression<Func<TService, TResponse>> expr, CancellationToken cancellationToken = default )
             {
-                SendMessageOrNotification( expr, true );
+                SendMessageOrNotification( expr, true, cancellationToken );
             }
 
-            AsyncJob<ServiceMethodResponse>? SendMessageOrNotification<TResponse>( Expression<Func<TService, TResponse>> expr, bool isNotification )
+            AsyncJob<ServiceMethodResponse>? SendMessageOrNotification<TResponse>( Expression<Func<TService, TResponse>> expr, bool isNotification, CancellationToken cancellationToken = default )
             {
                 ArgumentNullException.ThrowIfNull( expr );
 
@@ -97,6 +100,7 @@ namespace SteamKit2
 
                 var method = sendMessageMethod.MakeGenericMethod( message.GetType() );
                 var result = method.Invoke( this.steamUnifiedMessages, new[] { rpcName, message } )!;
+                cancellationToken.Register( () => ( ( AsyncJob<ServiceMethodResponse> )result ).SetFailed(false /* Cancel */) );
                 return ( AsyncJob<ServiceMethodResponse> )result;
             }
 

@@ -6,6 +6,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using SteamKit2.Internal;
 
 namespace SteamKit2
@@ -116,8 +117,9 @@ namespace SteamKit2
         /// </summary>
         /// <param name="app">App id to request access token for.</param>
         /// <param name="package">Package id to request access token for.</param>
+        /// <param name="cancellationToken"></param>
         /// <returns>The Job ID of the request. This can be used to find the appropriate <see cref="PICSTokensCallback"/>.</returns>
-        public AsyncJob<PICSTokensCallback> PICSGetAccessTokens( uint? app, uint? package )
+        public AsyncJob<PICSTokensCallback> PICSGetAccessTokens( uint? app, uint? package, CancellationToken cancellationToken = default )
         {
             List<uint> apps = [];
             List<uint> packages = [];
@@ -125,7 +127,7 @@ namespace SteamKit2
             if ( app.HasValue ) apps.Add( app.Value );
             if ( package.HasValue ) packages.Add( package.Value );
 
-            return PICSGetAccessTokens( apps, packages );
+            return PICSGetAccessTokens( apps, packages, cancellationToken );
         }
 
         /// <summary>
@@ -135,8 +137,9 @@ namespace SteamKit2
         /// </summary>
         /// <param name="appIds">List of app ids to request access tokens for.</param>
         /// <param name="packageIds">List of package ids to request access tokens for.</param>
+        /// <param name="cancellationToken"></param>
         /// <returns>The Job ID of the request. This can be used to find the appropriate <see cref="PICSTokensCallback"/>.</returns>
-        public AsyncJob<PICSTokensCallback> PICSGetAccessTokens( IEnumerable<uint> appIds, IEnumerable<uint> packageIds )
+        public AsyncJob<PICSTokensCallback> PICSGetAccessTokens( IEnumerable<uint> appIds, IEnumerable<uint> packageIds, CancellationToken cancellationToken = default )
         {
             var request = new ClientMsgProtobuf<CMsgClientPICSAccessTokenRequest>( EMsg.ClientPICSAccessTokenRequest );
             request.SourceJobID = Client.GetNextJobID();
@@ -146,7 +149,7 @@ namespace SteamKit2
 
             this.Client.Send( request );
 
-            return new AsyncJob<PICSTokensCallback>( this.Client, request.SourceJobID );
+            return new AsyncJob<PICSTokensCallback>( this.Client, request.SourceJobID, cancellationToken );
         }
 
         /// <summary>
@@ -158,7 +161,7 @@ namespace SteamKit2
         /// <param name="sendAppChangelist">Whether to send app changes.</param>
         /// <param name="sendPackageChangelist">Whether to send package changes.</param>
         /// <returns>The Job ID of the request. This can be used to find the appropriate <see cref="PICSChangesCallback"/>.</returns>
-        public AsyncJob<PICSChangesCallback> PICSGetChangesSince( uint lastChangeNumber = 0, bool sendAppChangelist = true, bool sendPackageChangelist = false )
+        public AsyncJob<PICSChangesCallback> PICSGetChangesSince( uint lastChangeNumber = 0, bool sendAppChangelist = true, bool sendPackageChangelist = false, CancellationToken cancellationToken = default )
         {
             var request = new ClientMsgProtobuf<CMsgClientPICSChangesSinceRequest>( EMsg.ClientPICSChangesSinceRequest );
             request.SourceJobID = Client.GetNextJobID();
@@ -169,7 +172,7 @@ namespace SteamKit2
 
             this.Client.Send( request );
 
-            return new AsyncJob<PICSChangesCallback>( this.Client, request.SourceJobID );
+            return new AsyncJob<PICSChangesCallback>( this.Client, request.SourceJobID, cancellationToken );
         }
 
         /// <summary>
@@ -180,8 +183,9 @@ namespace SteamKit2
         /// <param name="app"><see cref="PICSRequest"/> request for an app.</param>
         /// <param name="package"><see cref="PICSRequest"/> request for a package.</param>
         /// <param name="metaDataOnly">Whether to send only meta data.</param>
+        /// <param name="cancellationToken"></param>
         /// <returns>The Job ID of the request. This can be used to find the appropriate <see cref="PICSProductInfoCallback"/>.</returns>
-        public AsyncJobMultiple<PICSProductInfoCallback> PICSGetProductInfo( PICSRequest? app, PICSRequest? package, bool metaDataOnly = false )
+        public AsyncJobMultiple<PICSProductInfoCallback> PICSGetProductInfo( PICSRequest? app, PICSRequest? package, bool metaDataOnly = false, CancellationToken cancellationToken = default )
         {
             var apps = new List<PICSRequest>();
             var packages = new List<PICSRequest>();
@@ -189,7 +193,7 @@ namespace SteamKit2
             if ( app.HasValue ) apps.Add( app.Value );
             if ( package.HasValue ) packages.Add( package.Value );
 
-            return PICSGetProductInfo( apps, packages, metaDataOnly );
+            return PICSGetProductInfo( apps, packages, metaDataOnly, cancellationToken );
         }
 
         /// <summary>
@@ -200,8 +204,9 @@ namespace SteamKit2
         /// <param name="apps">List of <see cref="PICSRequest"/> requests for apps.</param>
         /// <param name="packages">List of <see cref="PICSRequest"/> requests for packages.</param>
         /// <param name="metaDataOnly">Whether to send only meta data.</param>
+        /// <param name="cancellationToken"></param>
         /// <returns>The Job ID of the request. This can be used to find the appropriate <see cref="PICSProductInfoCallback"/>.</returns>
-        public AsyncJobMultiple<PICSProductInfoCallback> PICSGetProductInfo( IEnumerable<PICSRequest> apps, IEnumerable<PICSRequest> packages, bool metaDataOnly = false )
+        public AsyncJobMultiple<PICSProductInfoCallback> PICSGetProductInfo( IEnumerable<PICSRequest> apps, IEnumerable<PICSRequest> packages, bool metaDataOnly = false, CancellationToken cancellationToken = default )
         {
             ArgumentNullException.ThrowIfNull( apps );
 
@@ -233,7 +238,7 @@ namespace SteamKit2
 
             this.Client.Send( request );
 
-            return new AsyncJobMultiple<PICSProductInfoCallback>( this.Client, request.SourceJobID, callback => !callback.ResponsePending );
+            return new AsyncJobMultiple<PICSProductInfoCallback>( this.Client, request.SourceJobID, callback => !callback.ResponsePending, cancellationToken );
         }
 
 

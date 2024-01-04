@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using SteamKit2.Util;
 
@@ -175,6 +176,21 @@ namespace SteamKit2
             RegisterJob( client );
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AsyncJob{T}" /> class.
+        /// </summary>
+        /// <param name="client">The <see cref="SteamClient"/> that this job will be associated with.</param>
+        /// <param name="jobId">The Job ID value associated with this async job.</param>
+        /// <param name="cancellationToken">CancellationToken</param>
+        public AsyncJob( SteamClient client, JobID jobId , CancellationToken cancellationToken)
+            : base( client, jobId )
+        {
+            tcs = new TaskCompletionSource<T>( TaskCreationOptions.RunContinuationsAsynchronously );
+
+            cancellationToken.Register( () => tcs.TrySetCanceled() );
+            RegisterJob( client );
+        }
+
 
         /// <summary>
         /// Converts this <see cref="AsyncJob{T}"/> instance into a TPL <see cref="Task{T}"/>.
@@ -280,6 +296,25 @@ namespace SteamKit2
                     : base( client, jobId )
         {
             tcs = new TaskCompletionSource<ResultSet>( TaskCreationOptions.RunContinuationsAsynchronously );
+
+            this.finishCondition = finishCondition;
+
+            RegisterJob( client );
+        }
+
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AsyncJob{T}" /> class.
+        /// </summary>
+        /// <param name="client">The <see cref="SteamClient"/> that this job will be associated with.</param>
+        /// <param name="jobId">The Job ID value associated with this async job.</param>
+        /// <param name="finishCondition">The condition that must be fulfilled for the result set to be considered complete.</param>
+        public AsyncJobMultiple( SteamClient client, JobID jobId, Predicate<T> finishCondition, CancellationToken cancellationToken )
+                    : base( client, jobId )
+        {
+            tcs = new TaskCompletionSource<ResultSet>( TaskCreationOptions.RunContinuationsAsynchronously );
+
+            cancellationToken.Register( () => tcs.TrySetCanceled() );
 
             this.finishCondition = finishCondition;
 
