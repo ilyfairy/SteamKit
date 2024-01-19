@@ -78,6 +78,16 @@ namespace SteamKit2
                 Handle( call );
             }
         }
+
+        public void EnsureRunAllCallbacks()
+        {
+            var calls = client.GetAllAvailableCallbacks();
+            foreach ( var call in calls )
+            {
+                Handle( call );
+            }
+        }
+
         /// <summary>
         /// Blocks the current thread to run a single queued callback.
         /// If no callback is queued, the method will block until one is posted.

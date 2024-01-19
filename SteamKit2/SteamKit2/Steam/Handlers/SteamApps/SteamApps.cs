@@ -97,7 +97,7 @@ namespace SteamKit2
         /// <param name="depotid">The DepotID to request a decryption key for.</param>
         /// <param name="appid">The AppID parent of the DepotID.</param>
         /// <returns>The Job ID of the request. This can be used to find the appropriate <see cref="DepotKeyCallback"/>.</returns>
-        public AsyncJob<DepotKeyCallback> GetDepotDecryptionKey( uint depotid, uint appid )
+        public AsyncJob<DepotKeyCallback> GetDepotDecryptionKey( uint depotid, uint appid, CancellationToken cancellationToken = default )
         {
             var request = new ClientMsgProtobuf<CMsgClientGetDepotDecryptionKey>( EMsg.ClientGetDepotDecryptionKey );
             request.SourceJobID = Client.GetNextJobID();
@@ -107,7 +107,7 @@ namespace SteamKit2
 
             this.Client.Send( request );
 
-            return new AsyncJob<DepotKeyCallback>( this.Client, request.SourceJobID );
+            return new AsyncJob<DepotKeyCallback>( this.Client, request.SourceJobID, cancellationToken );
         }
 
         /// <summary>

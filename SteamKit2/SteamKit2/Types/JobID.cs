@@ -88,6 +88,8 @@ namespace SteamKit2
     /// </summary>
     public abstract class AsyncJob
     {
+        public static TimeSpan DefaultTimeout { get; set; } = TimeSpan.FromSeconds( 30 );
+
         ValueStopwatch jobStart;
 
 
@@ -99,7 +101,7 @@ namespace SteamKit2
         /// <summary>
         /// Gets or sets the period of time before this job will be considered timed out and will be canceled. By default this is 10 seconds.
         /// </summary>
-        public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds( 10 );
+        public TimeSpan Timeout { get; set; } = DefaultTimeout;
 
         internal bool IsTimedout
         {

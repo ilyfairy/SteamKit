@@ -299,6 +299,25 @@ namespace SteamKit2
 
             return callbacks;
         }
+
+        public IEnumerable<ICallbackMsg> GetAllAvailableCallbacks()
+        {
+            IEnumerable<ICallbackMsg> callbacks;
+
+            lock ( callbackLock )
+            {
+                if ( callbackQueue.Count == 0 )
+                {
+                    return Enumerable.Empty<ICallbackMsg>();
+                }
+
+                callbacks = callbackQueue.ToArray();
+                callbackQueue.Clear();
+            }
+
+            return callbacks;
+        }
+
         /// <summary>
         /// Frees the last callback in the queue.
         /// </summary>

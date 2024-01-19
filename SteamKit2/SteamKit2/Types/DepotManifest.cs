@@ -170,7 +170,17 @@ namespace SteamKit2
 
         internal DepotManifest(byte[] data)
         {
-            InternalDeserialize(data);
+            InternalDeserialize(new MemoryStream( data ) );
+        }
+
+        internal DepotManifest(MemoryStream memoryStream)
+        {
+            InternalDeserialize(memoryStream);
+        }
+
+        internal DepotManifest(FileStream fileStream)
+        {
+            InternalDeserialize(fileStream);
         }
 
         /// <summary>
@@ -180,6 +190,10 @@ namespace SteamKit2
         /// <param name="data">Raw depot manifest data to deserialize.</param>
         /// <exception cref="InvalidDataException">Thrown if the given data is not something recognizable.</exception>
         public static DepotManifest Deserialize(byte[] data) => new(data);
+
+        public static DepotManifest Deserialize(MemoryStream memoryStream) => new(memoryStream);
+
+        public static DepotManifest Deserialize(FileStream fileStream) => new(fileStream);
 
         /// <summary>
         /// Attempts to decrypts file names with the given encryption key.
@@ -249,67 +263,63 @@ namespace SteamKit2
                 return null;
 
             using var fs = File.Open( filename, FileMode.Open );
-            using var ms = new MemoryStream();
-            fs.CopyTo( ms );
-            return Deserialize( ms.ToArray() );
+            return new DepotManifest(fs);
         }
 
-        void InternalDeserialize(byte[] data)
+
+        void InternalDeserialize(Stream seekableStream)
         {
             ContentManifestPayload? payload = null;
             ContentManifestMetadata? metadata = null;
             ContentManifestSignature? signature = null;
 
-            using ( var ms = new MemoryStream( data ) )
-            using ( var br = new BinaryReader( ms ) )
+            using var br = new BinaryReader( seekableStream );
+            while ( ( seekableStream.Length - seekableStream.Position ) > 0 )
             {
-                while ( ( ms.Length - ms.Position ) > 0 )
+                uint magic = br.ReadUInt32();
+
+                switch ( magic )
                 {
-                    uint magic = br.ReadUInt32();
+                    case Steam3Manifest.MAGIC:
+                        seekableStream.Seek( -4, SeekOrigin.Current );
+                        Steam3Manifest binaryManifest = new Steam3Manifest( br );
+                        ParseBinaryManifest( binaryManifest );
 
-                    switch ( magic )
-                    {
-                        case Steam3Manifest.MAGIC:
-                            ms.Seek(-4, SeekOrigin.Current);
-                            Steam3Manifest binaryManifest = new Steam3Manifest( br );
-                            ParseBinaryManifest( binaryManifest );
+                        uint marker = br.ReadUInt32();
+                        if ( marker != magic )
+                            throw new InvalidDataException( "Unable to find end of message marker for depot manifest" );
+                        break;
 
-                            uint marker = br.ReadUInt32();
-                            if ( marker != magic )
-                                throw new InvalidDataException( "Unable to find end of message marker for depot manifest" );
-                            break;
+                    case DepotManifest.PROTOBUF_PAYLOAD_MAGIC:
+                        uint payload_length = br.ReadUInt32();
+                        byte[] payload_bytes = br.ReadBytes( ( int )payload_length );
+                        using ( var ms_payload = new MemoryStream( payload_bytes ) )
+                            payload = Serializer.Deserialize<ContentManifestPayload>( ms_payload );
+                        break;
 
-                        case DepotManifest.PROTOBUF_PAYLOAD_MAGIC:
-                            uint payload_length = br.ReadUInt32();
-                            byte[] payload_bytes = br.ReadBytes( (int)payload_length );
-                            using ( var ms_payload = new MemoryStream( payload_bytes ) ) 
-                                payload = Serializer.Deserialize<ContentManifestPayload>( ms_payload );
-                            break;
+                    case DepotManifest.PROTOBUF_METADATA_MAGIC:
+                        uint metadata_length = br.ReadUInt32();
+                        byte[] metadata_bytes = br.ReadBytes( ( int )metadata_length );
+                        using ( var ms_metadata = new MemoryStream( metadata_bytes ) )
+                            metadata = Serializer.Deserialize<ContentManifestMetadata>( ms_metadata );
+                        break;
 
-                        case DepotManifest.PROTOBUF_METADATA_MAGIC:
-                            uint metadata_length = br.ReadUInt32();
-                            byte[] metadata_bytes = br.ReadBytes( (int)metadata_length );
-                            using ( var ms_metadata = new MemoryStream( metadata_bytes ) )
-                                metadata = Serializer.Deserialize<ContentManifestMetadata>( ms_metadata );
-                            break;
+                    case DepotManifest.PROTOBUF_SIGNATURE_MAGIC:
+                        uint signature_length = br.ReadUInt32();
+                        byte[] signature_bytes = br.ReadBytes( ( int )signature_length );
+                        using ( var ms_signature = new MemoryStream( signature_bytes ) )
+                            signature = Serializer.Deserialize<ContentManifestSignature>( ms_signature );
+                        break;
 
-                        case DepotManifest.PROTOBUF_SIGNATURE_MAGIC:
-                            uint signature_length = br.ReadUInt32();
-                            byte[] signature_bytes = br.ReadBytes( (int)signature_length );
-                            using ( var ms_signature = new MemoryStream( signature_bytes ) )
-                                signature = Serializer.Deserialize<ContentManifestSignature>( ms_signature );
-                            break;
+                    case DepotManifest.PROTOBUF_ENDOFMANIFEST_MAGIC:
+                        break;
 
-                        case DepotManifest.PROTOBUF_ENDOFMANIFEST_MAGIC:
-                            break;
-
-                        default:
-                            throw new InvalidDataException( $"Unrecognized magic value {magic:X} in depot manifest." );
-                    }
+                    default:
+                        throw new InvalidDataException( $"Unrecognized magic value {magic:X} in depot manifest." );
                 }
             }
 
-            if (payload != null && metadata != null && signature != null)
+            if ( payload != null && metadata != null && signature != null)
             {
                 ParseProtobufManifestMetadata(metadata);
                 ParseProtobufManifestPayload(payload);
@@ -371,7 +381,7 @@ namespace SteamKit2
             EncryptedCRC = metadata.crc_encrypted;
         }
 
-        byte[]? Serialize()
+        public void SerializeToStream(Stream stream)
         {
             DebugLog.Assert( Files != null, nameof( DepotManifest ), "Files was null when attempting to serialize manifest." );
 
@@ -435,7 +445,7 @@ namespace SteamKit2
                 int len = ( int )ms_payload.Length;
                 byte[] data = new byte[ 4 + len ];
                 Buffer.BlockCopy( BitConverter.GetBytes( len ), 0, data, 0, 4 );
-                Buffer.BlockCopy( ms_payload.ToArray(), 0, data, 4, len );
+                Buffer.BlockCopy( ms_payload.GetBuffer(), 0, data, 4, len );
                 uint crc32 = Crc32.HashToUInt32( data );
 
                 if ( FilenamesEncrypted )
@@ -450,8 +460,7 @@ namespace SteamKit2
                 }
             }
 
-            using var ms = new MemoryStream();
-            using var bw = new BinaryWriter( ms );
+            var bw = new BinaryWriter( stream );
 
             // Write Protobuf payload
             using ( var ms_payload = new MemoryStream() )
@@ -459,7 +468,7 @@ namespace SteamKit2
                 Serializer.Serialize<ContentManifestPayload>( ms_payload, payload );
                 bw.Write( DepotManifest.PROTOBUF_PAYLOAD_MAGIC );
                 bw.Write( ( int )ms_payload.Length );
-                bw.Write( ms_payload.ToArray() );
+                bw.Write( ms_payload.GetBuffer(), 0, ( int )ms_payload.Length );
             }
 
             // Write Protobuf metadata
@@ -468,7 +477,7 @@ namespace SteamKit2
                 Serializer.Serialize<ContentManifestMetadata>( ms_metadata, metadata );
                 bw.Write( DepotManifest.PROTOBUF_METADATA_MAGIC );
                 bw.Write( ( int )ms_metadata.Length );
-                bw.Write( ms_metadata.ToArray() );
+                bw.Write( ms_metadata.GetBuffer(), 0, ( int )ms_metadata.Length );
             }
 
             // Write empty signature section
@@ -478,6 +487,13 @@ namespace SteamKit2
             // Write EOF marker
             bw.Write( DepotManifest.PROTOBUF_ENDOFMANIFEST_MAGIC );
 
+            bw.Flush();
+        }
+
+        public byte[]? Serialize()
+        {
+            MemoryStream ms = new();
+            SerializeToStream( ms );
             return ms.ToArray();
         }
     }

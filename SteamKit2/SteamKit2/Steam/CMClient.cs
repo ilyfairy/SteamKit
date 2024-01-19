@@ -163,10 +163,14 @@ namespace SteamKit2.Internal
         /// </param>
         public async Task Connect( ServerRecord? cmServer = null, CancellationToken cancellationToken = default )
         {
-            Disconnect( userInitiated: true );
             try
             {
                 await connectionLock.WaitAsync( cancellationToken );
+
+                if ( IsConnected )
+                    return;
+
+                DisconnectNoneLock( userInitiated: true );
 
                 DebugLog.Assert( connection == null, nameof( CMClient ), "Connection is not null" );
                 DebugLog.Assert( connectionSetupTask == null, nameof( CMClient ), "Connection setup task is not null" );
@@ -290,6 +294,28 @@ namespace SteamKit2.Internal
             {
                 connectionLock.Release();
             }
+        }
+
+
+        private void DisconnectNoneLock( bool userInitiated )
+        {
+            heartBeatFunc.Stop();
+
+            if ( connectionCancellation != null )
+            {
+                connectionCancellation.Cancel();
+                connectionCancellation.Dispose();
+                connectionCancellation = null;
+            }
+
+            var connectionSetupTaskToWait = Interlocked.Exchange( ref connectionSetupTask, null );
+
+            // though it's ugly, we want to wait for the completion of this task and keep hold of the lock
+            connectionSetupTaskToWait?.GetAwaiter().GetResult();
+
+            // Connection implementations are required to issue the Disconnected callback before Disconnect() returns
+            connection?.Disconnect( userInitiated );
+            DebugLog.Assert( connection == null, nameof( CMClient ), "Connection was not released in disconnect." );
         }
 
         /// <summary>
