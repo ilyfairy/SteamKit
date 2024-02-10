@@ -165,7 +165,7 @@ namespace SteamKit2.Internal
         {
             try
             {
-                await connectionLock.WaitAsync( cancellationToken );
+                await connectionLock.WaitAsync( cancellationToken ).ConfigureAwait(false);
 
                 if ( IsConnected )
                     return;
@@ -199,7 +199,7 @@ namespace SteamKit2.Internal
 
                 try
                 {
-                    record = await recordTask;
+                    record = await recordTask.ConfigureAwait(false);
                 }
                 catch( OperationCanceledException )
                 {
@@ -241,7 +241,7 @@ namespace SteamKit2.Internal
 
                 try
                 {
-                    await newConnection.ConnectAsync( record.EndPoint, ( int )ConnectionTimeout.TotalMilliseconds );
+                    await newConnection.ConnectAsync( record.EndPoint, ( int )ConnectionTimeout.TotalMilliseconds ).ConfigureAwait(false);
                 }
                 catch ( Exception e)
                 {

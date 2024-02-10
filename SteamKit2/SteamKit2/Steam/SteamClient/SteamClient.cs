@@ -12,6 +12,7 @@ using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using ProtoBuf;
 using SteamKit2.Authentication;
 using SteamKit2.Internal;
@@ -286,7 +287,7 @@ namespace SteamKit2
                 {
                     if ( !Monitor.Wait( callbackLock, timeout ) )
                     {
-                        return Enumerable.Empty<ICallbackMsg>();
+                        return [];
                     }
                 }
 
@@ -308,7 +309,7 @@ namespace SteamKit2
             {
                 if ( callbackQueue.Count == 0 )
                 {
-                    return Enumerable.Empty<ICallbackMsg>();
+                    return [];
                 }
 
                 callbacks = callbackQueue.ToArray();
@@ -316,6 +317,24 @@ namespace SteamKit2
             }
 
             return callbacks;
+        }
+
+        public async Task WaitConnectionCallbackAsync()
+        {
+            while ( true )
+            {
+                lock ( callbackLock )
+                {
+                    foreach ( var item in callbackQueue )
+                    {
+                        if ( item is ConnectedCallback or DisconnectedCallback )
+                        {
+                            return;
+                        }
+                    }
+                }
+                await Task.Delay(100);
+            }
         }
 
         /// <summary>

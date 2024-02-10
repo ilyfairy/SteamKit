@@ -94,14 +94,14 @@ namespace SteamKit2
                     var notification = typeof( SteamUnifiedMessages )
                         .GetMethod( nameof( SteamUnifiedMessages.SendNotification ), BindingFlags.Public | BindingFlags.Instance )!
                         .MakeGenericMethod( message.GetType() );
-                    notification.Invoke( this.steamUnifiedMessages, new[] { rpcName, message } );
+                    notification.Invoke( this.steamUnifiedMessages, [rpcName, message] );
                     return null;
                 }
 
                 var method = sendMessageMethod.MakeGenericMethod( message.GetType() );
-                var result = method.Invoke( this.steamUnifiedMessages, new[] { rpcName, message } )!;
-                cancellationToken.Register( () => ( ( AsyncJob<ServiceMethodResponse> )result ).SetFailed(false /* Cancel */) );
-                return ( AsyncJob<ServiceMethodResponse> )result;
+                var result = ( AsyncJob<ServiceMethodResponse> )method.Invoke( this.steamUnifiedMessages, [rpcName, message] )!;
+                cancellationToken.Register( () => result.SetFailed(false /* Cancel */) );
+                return result;
             }
 
             static MethodCallExpression ExtractMethodCallExpression<TResponse>( Expression<Func<TService, TResponse>> expression, string paramName )
