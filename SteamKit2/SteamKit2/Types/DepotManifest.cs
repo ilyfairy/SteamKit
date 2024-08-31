@@ -169,9 +169,9 @@ namespace SteamKit2
         public uint EncryptedCRC { get; private set; }
 
 
-        internal DepotManifest(byte[] data)
+        internal DepotManifest(byte[] data, int? length = null)
         {
-            InternalDeserialize(data);
+            InternalDeserialize(data, length);
         }
 
         /// <summary>
@@ -295,13 +295,13 @@ namespace SteamKit2
             return Deserialize( ms.ToArray() );
         }
 
-        void InternalDeserialize(byte[] data)
+        void InternalDeserialize(byte[] data, int? length = null)
         {
             ContentManifestPayload? payload = null;
             ContentManifestMetadata? metadata = null;
             ContentManifestSignature? signature = null;
 
-            using ( var ms = new MemoryStream( data ) )
+            using ( var ms = new MemoryStream( data, 0, length ?? data.Length ) )
             using ( var br = new BinaryReader( ms ) )
             {
                 while ( ( ms.Length - ms.Position ) > 0 )

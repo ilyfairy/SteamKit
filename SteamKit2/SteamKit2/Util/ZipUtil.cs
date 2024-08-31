@@ -6,6 +6,7 @@
 
 
 using System;
+using System.Buffers;
 using System.IO;
 using System.IO.Compression;
 using System.IO.Hashing;
@@ -14,9 +15,9 @@ namespace SteamKit2
 {
     static class ZipUtil
     {
-        public static byte[] Decompress( byte[] buffer )
+        public static byte[] Decompress( byte[] buffer, int? len = null )
         {
-            using var ms = new MemoryStream( buffer );
+            using var ms = new MemoryStream( buffer, 0, len ?? buffer.Length );
             using var zip = new ZipArchive( ms );
             var entries = zip.Entries;
 
@@ -37,6 +38,31 @@ namespace SteamKit2
             }
 
             return decompressed;
+        }
+
+        public static (byte[] SharedArrayData, int Length) DecompressToSharedArray( byte[] buffer, int? length = null )
+        {
+            using var ms = new MemoryStream( buffer, 0, length ?? buffer.Length );
+            using var zip = new ZipArchive( ms );
+            var entries = zip.Entries;
+
+            DebugLog.Assert( entries.Count == 1, nameof( ZipUtil ), "Expected the zip to contain only one file" );
+
+            var entry = entries[ 0 ];
+            var decompressed = ArrayPool<byte>.Shared.Rent( ( int )entry.Length );
+
+            using var entryStream = entry.Open();
+            using var entryMemory = new MemoryStream( decompressed );
+            entryStream.CopyTo( entryMemory );
+
+            var checkSum = Crc32.HashToUInt32( decompressed.AsSpan( 0, ( int )entry.Length ) );
+
+            if ( checkSum != entry.Crc32 )
+            {
+                throw new Exception( "Checksum validation failed for decompressed file" );
+            }
+
+            return (decompressed, ( int )entry.Length);
         }
     }
 }

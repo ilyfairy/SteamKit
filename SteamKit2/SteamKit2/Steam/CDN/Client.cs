@@ -4,6 +4,7 @@
  */
 
 using System;
+using System.Buffers;
 using System.IO;
 using System.Net.Http;
 using System.Threading;
@@ -67,7 +68,7 @@ namespace SteamKit2.CDN
         /// <exception cref="SteamKitWebRequestException">A network error occurred when performing the request.</exception>
         public async Task<DepotManifest> DownloadManifestAsync( uint depotId, ulong manifestId, ulong manifestRequestCode, Server server, byte[]? depotKey = null, Server? proxyServer = null )
         {
-            ArgumentNullException.ThrowIfNull( server );
+            //ArgumentNullException.ThrowIfNull( server );
 
             const uint MANIFEST_VERSION = 5;
             string url;
@@ -81,9 +82,40 @@ namespace SteamKit2.CDN
                 url = $"depot/{depotId}/manifest/{manifestId}/{MANIFEST_VERSION}";
             }
 
-            var manifestData = await DoRawCommandAsync( server, url, proxyServer ).ConfigureAwait( false );
+            var compressedManifest = await DoRawCommandSharedArrayAsync( server, url, proxyServer).ConfigureAwait( false );
+            var manifest = ZipUtil.DecompressToSharedArray( compressedManifest.SharedArrayData, compressedManifest.Length );
+            ArrayPool<byte>.Shared.Return( compressedManifest.SharedArrayData );
 
-            manifestData = ZipUtil.Decompress( manifestData );
+            var depotManifest = new DepotManifest( manifest.SharedArrayData, manifest.Length );
+            ArrayPool<byte>.Shared.Return( manifest.SharedArrayData );
+
+            if ( depotKey != null )
+            {
+                // if we have the depot key, decrypt the manifest filenames
+                depotManifest.DecryptFilenames( depotKey );
+            }
+
+            return depotManifest;
+        }
+
+        public async Task<DepotManifest> DownloadManifestOldAsync( uint depotId, ulong manifestId, ulong manifestRequestCode, Server server, byte[]? depotKey = null, Server? proxyServer = null )
+        {
+            //ArgumentNullException.ThrowIfNull( server );
+
+            const uint MANIFEST_VERSION = 5;
+            string url;
+
+            if ( manifestRequestCode > 0 )
+            {
+                url = $"depot/{depotId}/manifest/{manifestId}/{MANIFEST_VERSION}/{manifestRequestCode}";
+            }
+            else
+            {
+                url = $"depot/{depotId}/manifest/{manifestId}/{MANIFEST_VERSION}";
+            }
+
+            var compressedManifestData = await DoRawCommandAsync( server, url, proxyServer ).ConfigureAwait( false );
+            var manifestData = ZipUtil.Decompress( compressedManifestData );
 
             var depotManifest = new DepotManifest( manifestData );
 
@@ -151,9 +183,43 @@ namespace SteamKit2.CDN
             return depotChunk;
         }
 
-        async Task<byte[]> DoRawCommandAsync( Server server, string command, Server? proxyServer )
+        async Task<(byte[] SharedArrayData, int Length)> DoRawCommandSharedArrayAsync( Server server, string command, Server? proxyServer )
         {
-            var url = BuildCommand( server, command, proxyServer );
+            //var url = BuildCommand( server, command, proxyServer );
+            var url = "http://127.0.0.1:8000/manifest.bin";
+            using var request = new HttpRequestMessage( HttpMethod.Get, url );
+
+            using var cts = new CancellationTokenSource();
+            cts.CancelAfter( RequestTimeout );
+
+            try
+            {
+                using var response = await httpClient.SendAsync( request, HttpCompletionOption.ResponseHeadersRead, cts.Token ).ConfigureAwait( false );
+
+                if ( !response.IsSuccessStatusCode )
+                {
+                    throw new SteamKitWebRequestException( $"Response status code does not indicate success: {response.StatusCode:D} ({response.ReasonPhrase}).", response );
+                }
+
+                cts.CancelAfter( ResponseBodyTimeout );
+
+                var len = response.Content.Headers.ContentLength ?? 0;
+                var buffer = ArrayPool<byte>.Shared.Rent( ( int )len );
+                await response.Content.CopyToAsync( new MemoryStream( buffer ) );
+                return ( buffer, (int)len );
+
+            }
+            catch ( Exception ex )
+            {
+                DebugLog.WriteLine( nameof( CDN ), "Failed to complete web request to {0}: {1}", url, ex.Message );
+                throw;
+            }
+        }
+
+        async Task<byte[]> DoRawCommandAsync( Server server, string command, Server? proxyServer)
+        {
+            //var url = BuildCommand( server, command, proxyServer );
+            var url = "http://127.0.0.1:8000/manifest.bin";
             using var request = new HttpRequestMessage( HttpMethod.Get, url );
 
             using var cts = new CancellationTokenSource();
