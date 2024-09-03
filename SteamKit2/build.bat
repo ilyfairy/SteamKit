@@ -1,0 +1,1 @@
+@dotnet publish .\SteamKit2\SteamKit2.csproj -r browser-wasm /p:NativeDebugSymbols=false /p:StackTraceSupport=false /p:InvariantGlobalization=true --output build
